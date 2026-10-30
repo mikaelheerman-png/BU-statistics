@@ -1026,4 +1026,62 @@ function switchTab(tabId, e) {
   document.getElementById('tab-halloffame').style.display = tabId === 'halloffame' ? 'block' : 'none';
   document.getElementById('tab-yearly').style.display = tabId === 'yearly' ? 'block' : 'none';
 
-  document.querySelectorAll('.tab-btn').forEach(
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  if (e) e.target.classList.add('active');
+}
+
+function switchTabDirect(tabId) {
+  document.getElementById('tab-results').style.display = tabId === 'results' ? 'block' : 'none';
+  document.getElementById('tab-halloffame').style.display = tabId === 'halloffame' ? 'block' : 'none';
+  document.getElementById('tab-yearly').style.display = tabId === 'yearly' ? 'block' : 'none';
+
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  if (tabId === 'results') document.getElementById('tabBtnResults').classList.add('active');
+  if (tabId === 'halloffame') document.getElementById('tabBtnHOF').classList.add('active');
+  if (tabId === 'yearly') document.getElementById('tabBtnYearly').classList.add('active');
+}
+
+function openRunnerModal(name) {
+  const runnerRuns = data.filter(d => d.Nimi === name).sort((a, b) => b.Vuosi - a.Vuosi);
+  if (!runnerRuns.length) return;
+
+  const maxLoops = Math.max(...runnerRuns.map(r => r.Kierrokset));
+  const totalKm = runnerRuns.reduce((acc, r) => acc + r.Matka_km, 0).toFixed(1);
+
+  document.getElementById('modalName').textContent = name;
+  document.getElementById('modalCountry').textContent = runnerRuns[0].Maa === 'FIN' ? 'Suomi (FIN)' : runnerRuns[0].Maa;
+  document.getElementById('modalStarts').textContent = runnerRuns.length;
+  document.getElementById('modalPR').textContent = `${maxLoops} kierr.`;
+  document.getElementById('modalKm').textContent = `${totalKm} km`;
+
+  const badgesBox = document.getElementById('modalBadgesContainer');
+  badgesBox.innerHTML = `
+    <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-right: 8px;">Saavutetut rajat:</span>
+    ${getMilestoneBadges(maxLoops) || '<span style="font-size: 12px; color: var(--text-muted);">-</span>'}
+  `;
+
+  const tbody = document.getElementById('modalHistoryBody');
+  tbody.innerHTML = runnerRuns.map(r => `
+    <tr>
+      <td>${r.Vuosi}</td>
+      <td><span class="tag-status ${r.Sija === 'Winner' ? 'tag-winner' : (r.Sija === 'Assist' ? 'tag-assist' : 'tag-dnf')}">${r.Sija}</span></td>
+      <td class="num-col" style="font-weight: 700;">${r.Kierrokset}</td>
+      <td class="num-col">${r.Matka_km.toFixed(2)} km</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('runnerModal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('runnerModal').classList.remove('active');
+}
+
+document.getElementById('runnerModal').addEventListener('click', (e) => {
+  if (e.target.id === 'runnerModal') closeModal();
+});
+
+loadData();
+</script>
+</body>
+</html>
