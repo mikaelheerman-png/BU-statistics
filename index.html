@@ -290,18 +290,25 @@ function parseCSV(text) {
   const lines = text.trim().split('\n');
   const headers = lines[0].split(',').map(h => h.trim());
   return lines.slice(1).map(line => {
+    if (!line.trim()) return null; // Ohitetaan tyhjät rivit
     const vals = line.split(',').map(v => v.trim());
+    
+    // Muutetaan pilkku pisteeksi ennen desimaaliksi muuntamista:
+    const kmStr = vals[7] ? vals[7].replace(',', '.') : '0';
+    const km = parseFloat(kmStr) || 0;
+    const loops = parseInt(vals[6]) || 0;
+
     return {
       Kilpailu: vals[0],
-      Vuosi: parseInt(vals[1]),
-      Sija: parseInt(vals[2]),
-      Status: vals[3],
-      Nimi: vals[4],
+      Vuosi: parseInt(vals[1]) || 0,
+      Sija: parseInt(vals[2]) || 0,
+      Status: vals[3] || 'DNF',
+      Nimi: vals[4] || '',
       Maa: vals[5] || 'FIN',
-      Kierrokset: parseInt(vals[6]),
-      Matka_km: parseFloat(vals[7])
+      Kierrokset: loops,
+      Matka_km: km
     };
-  }).filter(r => !isNaN(r.Kierrokset));
+  }).filter(r => r && !isNaN(r.Kierrokset) && r.Kierrokset > 0);
 }
 
 // LATAA CSV ERILLISESTÄ TIEDOSTOSTA
