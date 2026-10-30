@@ -40,7 +40,7 @@
     .badge-suomi { background: linear-gradient(135deg, #0284c7, #0369a1); font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 6px; letter-spacing: 0.5px; }
     .title-group p { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
 
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 24px; }
     .kpi-card { 
       background: var(--card-bg); 
       border: 1px solid var(--card-border); 
@@ -57,10 +57,7 @@
     .kpi-card:nth-child(3)::after { background: #38bdf8; }
     .kpi-card:nth-child(4)::after { background: #a855f7; }
 
-    /* Klikattava 100 mailin kerho -kortti */
-    .kpi-card-clickable {
-      cursor: pointer;
-    }
+    .kpi-card-clickable { cursor: pointer; }
     .kpi-card-clickable:hover {
       transform: translateY(-2px);
       border-color: rgba(168, 85, 247, 0.4);
@@ -136,27 +133,27 @@
       </div>
     </div>
 
+    <!-- Päämittarit (Päivittyvät valitun vuoden mukaan) -->
     <div class="kpi-grid">
       <div class="kpi-card">
-        <span class="kpi-label">Kaikkien aikojen ennätys</span>
+        <span class="kpi-label" id="kpiLabelRecord">Ennätys</span>
         <span class="kpi-value" id="kpiRecord">-</span>
         <span class="kpi-sub" id="kpiRecordHolder">-</span>
       </div>
       <div class="kpi-card">
-        <span class="kpi-label">Yhteensä suorituksia</span>
+        <span class="kpi-label" id="kpiLabelRuns">Suorituksia</span>
         <span class="kpi-value" id="kpiTotalRuns">-</span>
         <span class="kpi-sub" id="kpiRacesCount">-</span>
       </div>
       <div class="kpi-card">
-        <span class="kpi-label">Juostut kilometrit</span>
+        <span class="kpi-label" id="kpiLabelKm">Juostut kilometrit</span>
         <span class="kpi-value" id="kpiTotalKm">-</span>
         <span class="kpi-sub" id="kpiTotalLoops">-</span>
       </div>
-      <!-- Klikattava 100 mailin kerho -kortti -->
       <div class="kpi-card kpi-card-clickable" onclick="filter100MilesCard()" title="Klikkaa nähdäksesi 100 mailin juoksijat taulukossa">
         <span class="kpi-label">100 mailin kerho <span style="font-size: 10px; color: #a855f7;">Näytä ↗</span></span>
         <span class="kpi-value" id="kpi100m">-</span>
-        <span class="kpi-sub">≥ 24 kierrosta selvittäneet (klikkaa)</span>
+        <span class="kpi-sub" id="kpi100mSub">≥ 24 kierrosta selvittäneet</span>
       </div>
     </div>
 
@@ -305,7 +302,6 @@ let currentFiltered = [];
 let sortField = 'Vuosi';
 let sortAsc = false;
 
-// PARSI CSV
 function parseCSV(text) {
   const lines = text.trim().split('\n');
   return lines.slice(1).map(line => {
@@ -343,7 +339,7 @@ async function loadData() {
 }
 
 function init() {
-  updateKPIs();
+  updateKPIs('all');
   populateYearFilter();
   renderResultsTable(data);
   buildHallOfFame();
@@ -351,23 +347,56 @@ function init() {
   setupEvents();
 }
 
-function updateKPIs() {
-  const topRun = [...data].sort((a,b) => b.Kierrokset - a.Kierrokset)[0];
-  const totalRuns = data.length;
-  const totalLoops = data.reduce((acc, cur) => acc + cur.Kierrokset, 0);
-  const totalKm = Math.round(data.reduce((acc, cur) => acc + cur.Matka_km, 0));
-  const count100m = data.filter(d => d.Kierrokset >= 24).length;
-  const yearsCount = new Set(data.map(d => d.Vuosi)).size;
+// Päivittää mittarikortit valitun vuoden (tai kaikkien vuosien) mukaan
+function updateKPIs(selectedYear) {
+  const isAll = (selectedYear === 'all');
+  const dataset = isAll ? data : data.filter(d => d.Vuosi === parseInt(selectedYear));
+  if (!dataset.length) return;
 
-  if (topRun) {
+  const totalRuns = dataset.length;
+  const totalLoops = dataset.reduce((acc, cur) => acc + cur.Kierrokset, 0);
+  const totalKm = Math.round(dataset.reduce((acc, cur) => acc + cur.Matka_km, 0));
+  const avgLoops = (totalLoops / totalRuns).toFixed(1);
+  const avgKm = (dataset.reduce((acc, cur) => acc + cur.Matka_km, 0) / totalRuns).toFixed(1);
+  const count100m = dataset.filter(d => d.Kierrokset >= 24).length;
+
+  if (isAll) {
+    const topRun = [...data].sort((a,b) => b.Kierrokset - a.Kierrokset)[0];
+    const yearsCount = new Set(data.map(d => d.Vuosi)).size;
+
+    document.getElementById('kpiLabelRecord').textContent = 'Kaikkien aikojen ennätys';
     document.getElementById('kpiRecord').textContent = `${topRun.Kierrokset} kierr.`;
     document.getElementById('kpiRecordHolder').textContent = `${topRun.Nimi} (${topRun.Matka_km.toFixed(2)} km)`;
+
+    document.getElementById('kpiLabelRuns').textContent = 'Yhteensä suorituksia';
+    document.getElementById('kpiTotalRuns').textContent = totalRuns;
+    document.getElementById('kpiRacesCount').textContent = `${yearsCount} kilpailua • Ka. ${avgLoops} kierr. (${avgKm} km)`;
+
+    document.getElementById('kpiLabelKm').textContent = 'Juostut kilometrit';
+    document.getElementById('kpiTotalKm').textContent = totalKm.toLocaleString('fi-FI');
+    document.getElementById('kpiTotalLoops').textContent = `${totalLoops.toLocaleString('fi-FI')} kierrettyä kierrosta`;
+
+    document.getElementById('kpi100m').textContent = count100m;
+    document.getElementById('kpi100mSub').textContent = '≥ 24 kierrosta selvittäneet (kaikki vuodet)';
+  } else {
+    const winner = dataset.find(d => d.Sija === 'Winner') || [...dataset].sort((a,b) => b.Kierrokset - a.Kierrokset)[0];
+    const assist = dataset.find(d => d.Sija === 'Assist');
+
+    document.getElementById('kpiLabelRecord').textContent = `Voittotulos ${selectedYear}`;
+    document.getElementById('kpiRecord').textContent = `${winner.Kierrokset} kierr.`;
+    document.getElementById('kpiRecordHolder').textContent = `${winner.Nimi} (${winner.Matka_km.toFixed(2)} km)${assist ? ` • Assist: ${assist.Nimi}` : ''}`;
+
+    document.getElementById('kpiLabelRuns').textContent = `Osallistujia ${selectedYear}`;
+    document.getElementById('kpiTotalRuns').textContent = totalRuns;
+    document.getElementById('kpiRacesCount').textContent = `Ka. ${avgLoops} kierr. (${avgKm} km per juoksija)`;
+
+    document.getElementById('kpiLabelKm').textContent = `Kilometrit ${selectedYear}`;
+    document.getElementById('kpiTotalKm').textContent = totalKm.toLocaleString('fi-FI');
+    document.getElementById('kpiTotalLoops').textContent = `Yhteensä ${totalLoops.toLocaleString('fi-FI')} kierrettyä kierrosta`;
+
+    document.getElementById('kpi100m').textContent = count100m;
+    document.getElementById('kpi100mSub').textContent = `≥ 24 kierrosta vuonna ${selectedYear}`;
   }
-  document.getElementById('kpiTotalRuns').textContent = totalRuns;
-  document.getElementById('kpiRacesCount').textContent = `${yearsCount} kilpailua`;
-  document.getElementById('kpiTotalKm').textContent = totalKm.toLocaleString('fi-FI');
-  document.getElementById('kpiTotalLoops').textContent = `${totalLoops.toLocaleString('fi-FI')} kierrettyä kierrosta`;
-  document.getElementById('kpi100m').textContent = count100m;
 }
 
 function populateYearFilter() {
@@ -384,7 +413,11 @@ function populateYearFilter() {
 
 function setupEvents() {
   document.getElementById('searchInput').addEventListener('input', applyFilters);
-  document.getElementById('yearSelect').addEventListener('change', applyFilters);
+  document.getElementById('yearSelect').addEventListener('change', () => {
+    const yr = document.getElementById('yearSelect').value;
+    updateKPIs(yr);
+    applyFilters();
+  });
   document.getElementById('statusSelect').addEventListener('change', applyFilters);
 }
 
@@ -404,20 +437,24 @@ function applyFilters() {
   renderResultsTable(currentFiltered);
 }
 
-// 100 mailin kerho -kortin klikkaus
 function filter100MilesCard() {
-  // 1. Vaihdetaan tulosvälilehdelle
   switchTabDirect('results');
-
-  // 2. Tyhjennetään tekstihaku ja pudotusvalikot
   document.getElementById('searchInput').value = '';
-  document.getElementById('yearSelect').value = 'all';
   document.getElementById('statusSelect').value = 'all';
 
-  // 3. Suodatetaan 100 mailia (>= 24 kierrosta)
-  quickFilter('100m');
+  const year = document.getElementById('yearSelect').value;
+  document.querySelectorAll('.filter-pills .pill-btn').forEach(btn => btn.classList.remove('active'));
+  const p = document.getElementById('pill100m');
+  if (p) p.classList.add('active');
 
-  // 4. Vieritetään näyttö pehmeästi tulostaulukkoon
+  currentFiltered = data.filter(r => {
+    const matchYear = (year === 'all' || r.Vuosi === parseInt(year));
+    return matchYear && r.Kierrokset >= 24;
+  });
+
+  sortData();
+  renderResultsTable(currentFiltered);
+
   const target = document.getElementById('resultsTableContainer');
   if (target) {
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -426,20 +463,22 @@ function filter100MilesCard() {
 
 function quickFilter(type) {
   document.querySelectorAll('.filter-pills .pill-btn').forEach(btn => btn.classList.remove('active'));
+  const year = document.getElementById('yearSelect').value;
   
-  if (type === '100m') {
-    currentFiltered = data.filter(r => r.Kierrokset >= 24);
-    const p = document.getElementById('pill100m');
-    if (p) p.classList.add('active');
-  } else if (type === '100k') {
-    currentFiltered = data.filter(r => r.Kierrokset >= 15);
-    const p = document.getElementById('pill100k');
-    if (p) p.classList.add('active');
-  } else if (type === 'foreign') {
-    currentFiltered = data.filter(r => r.Maa !== 'FIN');
-    const p = document.getElementById('pillForeign');
-    if (p) p.classList.add('active');
-  }
+  currentFiltered = data.filter(r => {
+    const matchYear = (year === 'all' || r.Vuosi === parseInt(year));
+    if (!matchYear) return false;
+
+    if (type === '100m') return r.Kierrokset >= 24;
+    if (type === '100k') return r.Kierrokset >= 15;
+    if (type === 'foreign') return r.Maa !== 'FIN';
+    return true;
+  });
+
+  if (type === '100m') document.getElementById('pill100m')?.classList.add('active');
+  if (type === '100k') document.getElementById('pill100k')?.classList.add('active');
+  if (type === 'foreign') document.getElementById('pillForeign')?.classList.add('active');
+
   sortData();
   renderResultsTable(currentFiltered);
 }
@@ -449,6 +488,7 @@ function resetFilters() {
   document.getElementById('yearSelect').value = 'all';
   document.getElementById('statusSelect').value = 'all';
   document.querySelectorAll('.filter-pills .pill-btn').forEach(btn => btn.classList.remove('active'));
+  updateKPIs('all');
   currentFiltered = [...data];
   sortData();
   renderResultsTable(currentFiltered);
