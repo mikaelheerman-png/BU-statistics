@@ -156,8 +156,8 @@
           <option value="all">Kaikki vuodet</option>
         </select>
         <select id="statusSelect" class="select-input">
-          <option value="all">Kaikki statukset</option>
-          <option value="Winner">Vain Voittajat</option>
+          <option value="all">Kaikki (Sija / Tulos)</option>
+          <option value="Winner">Vain Voittajat (Winner)</option>
           <option value="Assist">Vain Assistit</option>
           <option value="DNF">Keskeyttäneet (DNF)</option>
         </select>
@@ -177,7 +177,6 @@
           <tr>
             <th onclick="sortTable('Vuosi')">Vuosi ⇕</th>
             <th onclick="sortTable('Sija')">Sija ⇕</th>
-            <th onclick="sortTable('Status')">Status ⇕</th>
             <th onclick="sortTable('Nimi')">Nimi ⇕</th>
             <th onclick="sortTable('Maa')">Maa ⇕</th>
             <th class="num-col" onclick="sortTable('Kierrokset')">Kierrokset ⇕</th>
@@ -185,7 +184,7 @@
           </tr>
         </thead>
         <tbody id="resultsBody">
-          <tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">Ladataan tuloksia...</td></tr>
+          <tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">Ladataan tuloksia...</td></tr>
         </tbody>
       </table>
     </div>
@@ -203,7 +202,7 @@
             <th>Kilpailu</th>
             <th class="num-col">Kierrokset</th>
             <th class="num-col">Matka (km)</th>
-            <th>Status</th>
+            <th>Sija</th>
           </tr>
         </thead>
         <tbody id="hallOfFameBody"></tbody>
@@ -267,7 +266,6 @@
             <tr>
               <th>Vuosi</th>
               <th>Sija</th>
-              <th>Status</th>
               <th class="num-col">Kierrokset</th>
               <th class="num-col">Matka</th>
             </tr>
@@ -285,33 +283,29 @@ let currentFiltered = [];
 let sortField = 'Vuosi';
 let sortAsc = false;
 
-// PARSI CSV
+// PARSI CSV (Lukee uuden 7-sarakkeisen rakenteen ja korjaa pilkut pisteiksi)
 function parseCSV(text) {
   const lines = text.trim().split('\n');
-  const headers = lines[0].split(',').map(h => h.trim());
   return lines.slice(1).map(line => {
-    if (!line.trim()) return null; // Ohitetaan tyhjät rivit
+    if (!line.trim()) return null;
     const vals = line.split(',').map(v => v.trim());
     
-    // Muutetaan pilkku pisteeksi ennen desimaaliksi muuntamista:
-    const kmStr = vals[7] ? vals[7].replace(',', '.') : '0';
+    const kmStr = vals[6] ? vals[6].replace(',', '.') : '0';
     const km = parseFloat(kmStr) || 0;
-    const loops = parseInt(vals[6]) || 0;
+    const loops = parseInt(vals[5]) || 0;
 
     return {
       Kilpailu: vals[0],
       Vuosi: parseInt(vals[1]) || 0,
-      Sija: parseInt(vals[2]) || 0,
-      Status: vals[3] || 'DNF',
-      Nimi: vals[4] || '',
-      Maa: vals[5] || 'FIN',
+      Sija: vals[2] || 'DNF', // Winner, Assist tai DNF
+      Nimi: vals[3] || '',
+      Maa: vals[4] || 'FIN',
       Kierrokset: loops,
       Matka_km: km
     };
   }).filter(r => r && !isNaN(r.Kierrokset) && r.Kierrokset > 0);
 }
 
-// LATAA CSV ERILLISESTÄ TIEDOSTOSTA
 async function loadData() {
   try {
     const res = await fetch('tulokset.csv');
@@ -322,7 +316,7 @@ async function loadData() {
     init();
   } catch (err) {
     document.getElementById('resultsBody').innerHTML = 
-      `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 24px;">Virhe ladattaessa tulokset.csv-tiedostoa. Varmista, että tiedosto on tallennettu GitHubiin.</td></tr>`;
+      `<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 24px;">Virhe ladattaessa tulokset.csv-tiedostoa.</td></tr>`;
   }
 }
 
@@ -380,7 +374,7 @@ function applyFilters() {
   currentFiltered = data.filter(r => {
     const matchName = r.Nimi.toLowerCase().includes(term);
     const matchYear = year === 'all' || r.Vuosi === parseInt(year);
-    const matchStatus = status === 'all' || r.Status === status;
+    const matchStatus = status === 'all' || r.Sija === status;
     return matchName && matchYear && matchStatus;
   });
 
@@ -414,7 +408,7 @@ function sortTable(field) {
     sortAsc = !sortAsc;
   } else {
     sortField = field;
-    sortAsc = (field === 'Nimi' || field === 'Maa');
+    sortAsc = (field === 'Nimi' || field === 'Maa' || field === 'Sija');
   }
   sortData();
   renderResultsTable(currentFiltered);
@@ -434,20 +428,19 @@ function sortData() {
 function renderResultsTable(items) {
   const tbody = document.getElementById('resultsBody');
   if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">Ei hakua vastaavia tuloksia.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">Ei hakua vastaavia tuloksia.</td></tr>';
     return;
   }
 
   tbody.innerHTML = items.map(r => {
     let statusClass = 'tag-dnf';
-    if (r.Status === 'Winner') statusClass = 'tag-winner';
-    if (r.Status === 'Assist') statusClass = 'tag-assist';
+    if (r.Sija === 'Winner') statusClass = 'tag-winner';
+    if (r.Sija === 'Assist') statusClass = 'tag-assist';
 
     return `
       <tr>
         <td>${r.Vuosi}</td>
-        <td>${r.Sija}.</td>
-        <td><span class="tag-status ${statusClass}">${r.Status}</span></td>
+        <td><span class="tag-status ${statusClass}">${r.Sija}</span></td>
         <td><span class="runner-link" onclick="openRunnerModal('${r.Nimi.replace(/'/g, "\\'")}')">${r.Nimi}</span></td>
         <td>${r.Maa}</td>
         <td class="num-col" style="font-weight: 700; color: #fff;">${r.Kierrokset}</td>
@@ -493,7 +486,7 @@ function buildHallOfFame() {
       <td>NBU ${r.Vuosi}</td>
       <td class="num-col" style="font-weight: 700; color: var(--accent);">${r.Kierrokset}</td>
       <td class="num-col">${r.Matka_km.toFixed(2)}</td>
-      <td><span class="tag-status ${r.Status === 'Winner' ? 'tag-winner' : (r.Status === 'Assist' ? 'tag-assist' : 'tag-dnf')}">${r.Status}</span></td>
+      <td><span class="tag-status ${r.Sija === 'Winner' ? 'tag-winner' : (r.Sija === 'Assist' ? 'tag-assist' : 'tag-dnf')}">${r.Sija}</span></td>
     </tr>
   `).join('');
 }
@@ -504,8 +497,8 @@ function buildYearlyComparison() {
   
   tbody.innerHTML = years.map(y => {
     const yearData = data.filter(d => d.Vuosi === y);
-    const winner = yearData.find(d => d.Status === 'Winner') || yearData[0];
-    const assist = yearData.find(d => d.Status === 'Assist') || yearData[1];
+    const winner = yearData.find(d => d.Sija === 'Winner') || yearData[0];
+    const assist = yearData.find(d => d.Sija === 'Assist') || yearData[1];
     const avgLoops = (yearData.reduce((acc, cur) => acc + cur.Kierrokset, 0) / yearData.length).toFixed(1);
     const count100m = yearData.filter(d => d.Kierrokset >= 24).length;
 
@@ -549,8 +542,7 @@ function openRunnerModal(name) {
   tbody.innerHTML = runnerRuns.map(r => `
     <tr>
       <td>${r.Vuosi}</td>
-      <td>${r.Sija}.</td>
-      <td><span class="tag-status ${r.Status === 'Winner' ? 'tag-winner' : (r.Status === 'Assist' ? 'tag-assist' : 'tag-dnf')}">${r.Status}</span></td>
+      <td><span class="tag-status ${r.Sija === 'Winner' ? 'tag-winner' : (r.Sija === 'Assist' ? 'tag-assist' : 'tag-dnf')}">${r.Sija}</span></td>
       <td class="num-col" style="font-weight: 700;">${r.Kierrokset}</td>
       <td class="num-col">${r.Matka_km.toFixed(2)} km</td>
     </tr>
@@ -567,7 +559,6 @@ document.getElementById('runnerModal').addEventListener('click', (e) => {
   if (e.target.id === 'runnerModal') closeModal();
 });
 
-// KÄYNNISTYS
 loadData();
 </script>
 </body>
