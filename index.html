@@ -41,12 +41,33 @@
     .title-group p { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
 
     .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px; }
-    .kpi-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 16px 20px; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+    .kpi-card { 
+      background: var(--card-bg); 
+      border: 1px solid var(--card-border); 
+      border-radius: var(--radius); 
+      padding: 16px 20px; 
+      display: flex; 
+      flex-direction: column; 
+      position: relative; 
+      overflow: hidden; 
+      transition: transform 0.15s, border-color 0.15s;
+    }
     .kpi-card::after { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--accent); }
     .kpi-card:nth-child(2)::after { background: var(--gold); }
     .kpi-card:nth-child(3)::after { background: #38bdf8; }
     .kpi-card:nth-child(4)::after { background: #a855f7; }
-    .kpi-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; }
+
+    /* Klikattava 100 mailin kerho -kortti */
+    .kpi-card-clickable {
+      cursor: pointer;
+    }
+    .kpi-card-clickable:hover {
+      transform: translateY(-2px);
+      border-color: rgba(168, 85, 247, 0.4);
+      background: rgba(168, 85, 247, 0.05);
+    }
+
+    .kpi-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
     .kpi-value { font-size: 26px; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin-top: 4px; color: #fff; }
     .kpi-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
@@ -131,17 +152,18 @@
         <span class="kpi-value" id="kpiTotalKm">-</span>
         <span class="kpi-sub" id="kpiTotalLoops">-</span>
       </div>
-      <div class="kpi-card">
-        <span class="kpi-label">100 mailin kerho</span>
+      <!-- Klikattava 100 mailin kerho -kortti -->
+      <div class="kpi-card kpi-card-clickable" onclick="filter100MilesCard()" title="Klikkaa nähdäksesi 100 mailin juoksijat taulukossa">
+        <span class="kpi-label">100 mailin kerho <span style="font-size: 10px; color: #a855f7;">Näytä ↗</span></span>
         <span class="kpi-value" id="kpi100m">-</span>
-        <span class="kpi-sub">≥ 24 kierrosta selvittäneet</span>
+        <span class="kpi-sub">≥ 24 kierrosta selvittäneet (klikkaa)</span>
       </div>
     </div>
 
     <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('results', event)">Kaikki tulokset</button>
-      <button class="tab-btn" onclick="switchTab('halloffame', event)">Hall of Fame (Top 25)</button>
-      <button class="tab-btn" onclick="switchTab('yearly', event)">Vuosivertailu</button>
+      <button class="tab-btn active" id="tabBtnResults" onclick="switchTab('results', event)">Kaikki tulokset</button>
+      <button class="tab-btn" id="tabBtnHOF" onclick="switchTab('halloffame', event)">Hall of Fame (Top 25)</button>
+      <button class="tab-btn" id="tabBtnYearly" onclick="switchTab('yearly', event)">Vuosivertailu</button>
     </div>
   </header>
 
@@ -164,14 +186,14 @@
       </div>
 
       <div class="filter-pills">
-        <button class="pill-btn" onclick="quickFilter('100m')">🏆 100 mailin kerho (≥24)</button>
-        <button class="pill-btn" onclick="quickFilter('100k')">⚡ 100 km ylittäjät (≥15)</button>
-        <button class="pill-btn" onclick="quickFilter('foreign')">🌍 Kansainväliset juoksijat</button>
+        <button class="pill-btn" id="pill100m" onclick="quickFilter('100m')">🏆 100 mailin kerho (≥24)</button>
+        <button class="pill-btn" id="pill100k" onclick="quickFilter('100k')">⚡ 100 km ylittäjät (≥15)</button>
+        <button class="pill-btn" id="pillForeign" onclick="quickFilter('foreign')">🌍 Kansainväliset juoksijat</button>
         <button class="pill-btn" onclick="resetFilters()">↺ Tyhjennä valinnat</button>
       </div>
     </div>
 
-    <div class="table-container">
+    <div class="table-container" id="resultsTableContainer">
       <table>
         <thead>
           <tr>
@@ -283,7 +305,7 @@ let currentFiltered = [];
 let sortField = 'Vuosi';
 let sortAsc = false;
 
-// PARSI CSV (Lukee uuden 7-sarakkeisen rakenteen ja korjaa pilkut pisteiksi)
+// PARSI CSV
 function parseCSV(text) {
   const lines = text.trim().split('\n');
   return lines.slice(1).map(line => {
@@ -297,7 +319,7 @@ function parseCSV(text) {
     return {
       Kilpailu: vals[0],
       Vuosi: parseInt(vals[1]) || 0,
-      Sija: vals[2] || 'DNF', // Winner, Assist tai DNF
+      Sija: vals[2] || 'DNF',
       Nimi: vals[3] || '',
       Maa: vals[4] || 'FIN',
       Kierrokset: loops,
@@ -382,13 +404,41 @@ function applyFilters() {
   renderResultsTable(currentFiltered);
 }
 
+// 100 mailin kerho -kortin klikkaus
+function filter100MilesCard() {
+  // 1. Vaihdetaan tulosvälilehdelle
+  switchTabDirect('results');
+
+  // 2. Tyhjennetään tekstihaku ja pudotusvalikot
+  document.getElementById('searchInput').value = '';
+  document.getElementById('yearSelect').value = 'all';
+  document.getElementById('statusSelect').value = 'all';
+
+  // 3. Suodatetaan 100 mailia (>= 24 kierrosta)
+  quickFilter('100m');
+
+  // 4. Vieritetään näyttö pehmeästi tulostaulukkoon
+  const target = document.getElementById('resultsTableContainer');
+  if (target) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
 function quickFilter(type) {
+  document.querySelectorAll('.filter-pills .pill-btn').forEach(btn => btn.classList.remove('active'));
+  
   if (type === '100m') {
     currentFiltered = data.filter(r => r.Kierrokset >= 24);
+    const p = document.getElementById('pill100m');
+    if (p) p.classList.add('active');
   } else if (type === '100k') {
     currentFiltered = data.filter(r => r.Kierrokset >= 15);
+    const p = document.getElementById('pill100k');
+    if (p) p.classList.add('active');
   } else if (type === 'foreign') {
     currentFiltered = data.filter(r => r.Maa !== 'FIN');
+    const p = document.getElementById('pillForeign');
+    if (p) p.classList.add('active');
   }
   sortData();
   renderResultsTable(currentFiltered);
@@ -398,6 +448,7 @@ function resetFilters() {
   document.getElementById('searchInput').value = '';
   document.getElementById('yearSelect').value = 'all';
   document.getElementById('statusSelect').value = 'all';
+  document.querySelectorAll('.filter-pills .pill-btn').forEach(btn => btn.classList.remove('active'));
   currentFiltered = [...data];
   sortData();
   renderResultsTable(currentFiltered);
@@ -523,6 +574,17 @@ function switchTab(tabId, e) {
 
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
   if (e) e.target.classList.add('active');
+}
+
+function switchTabDirect(tabId) {
+  document.getElementById('tab-results').style.display = tabId === 'results' ? 'block' : 'none';
+  document.getElementById('tab-halloffame').style.display = tabId === 'halloffame' ? 'block' : 'none';
+  document.getElementById('tab-yearly').style.display = tabId === 'yearly' ? 'block' : 'none';
+
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  if (tabId === 'results') document.getElementById('tabBtnResults').classList.add('active');
+  if (tabId === 'halloffame') document.getElementById('tabBtnHOF').classList.add('active');
+  if (tabId === 'yearly') document.getElementById('tabBtnYearly').classList.add('active');
 }
 
 function openRunnerModal(name) {
